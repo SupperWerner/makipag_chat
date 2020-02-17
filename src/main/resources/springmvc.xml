@@ -14,7 +14,7 @@ http://www.springframework.org/schema/mvc/spring-mvc.xsd">
     <!-- 配置视图解析器 -->
     <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
         <!-- 使用前缀和后缀 -->
-        <property name="prefix" value="/WEB-INF/pages/"></property>
+        <property name="prefix"  value="/WEB-INF/pages/"></property>
         <property name="suffix" value=".jsp"></property>
     </bean>
 
@@ -44,6 +44,7 @@ http://www.springframework.org/schema/mvc/spring-mvc.xsd">
     <mvc:resources location="/static/js/" mapping="/js/**"></mvc:resources>
     <mvc:resources location="/static/images/" mapping="/images/**"></mvc:resources>
     <mvc:resources location="/static/lib/" mapping="/lib/**"></mvc:resources>
+
 
 
 

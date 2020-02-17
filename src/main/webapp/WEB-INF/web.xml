@@ -13,7 +13,7 @@
   <!-- 设置配置文件的位置 -->
   <context-param>
     <param-name>contextConfigLocation</param-name>
-    <param-value>classpath:applicationContext.xml</param-value>
+    <param-value>classpath*:applicationContext.xml</param-value>
   </context-param>
 
 
@@ -40,7 +40,7 @@
     <!-- 初始化springmvc配置文件 -->
     <init-param>
       <param-name>contextConfigLocation</param-name>
-      <param-value>classpath:springmvc.xml</param-value>
+      <param-value>classpath*:springmvc.xml</param-value>
     </init-param>
     <load-on-startup>1</load-on-startup>
   </servlet>

@@ -9,6 +9,7 @@ import ots.layim.bean.OutputInfoBean.ResChatInfo;
 import ots.layim.bean.OutputInfoBean.ResultChatModel;
 import ots.layim.myenum.ChatEmit;
 import ots.layim.util.JacksonUtil;
+import ots.layim.util.WebsocketUtil;
 
 import javax.servlet.http.HttpSession;
 import javax.websocket.*;
@@ -17,6 +18,9 @@ import javax.websocket.server.ServerEndpoint;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 @Controller
 @ServerEndpoint(value = "/websocket/{id}")
@@ -38,7 +42,7 @@ public class WebSocketController {
 
 
     @OnOpen
-    public void onOpen(Session session , EndpointConfig config, @PathParam("id") String id){
+    public void onOpen(Session session , EndpointConfig config, @PathParam("id") String id ){
         // 1. 记录 webSocket：session
         this.session = session;
 
@@ -47,21 +51,22 @@ public class WebSocketController {
         HttpSession httpSession = (HttpSession)config.getUserProperties().get(HttpSession.class.getName());
         this.httpSession = httpSession;
 
+        String ip = getIp(id, (x) -> x + WebsocketUtil.getRemoteAddress(session).toString());
+
         // 3. 记录当前登录用户信息，以及对应的Endpoin实例
         if (!StringUtils.isEmpty(id)){
-            onlineUsers.put(id,this);
+            onlineUsers.put(ip,this);
         }
+        log.info("当前登录人id+ip为：{}",ip);
 
-        // 4. 当前所有用户
-        // getNames();
-        // 5. 组装消息
+
 
         // 6. 通过广播的方式推送消息
         //session.getBasicRemote().sendText("");
 
         broadcastAllUsers("");
         addCount();
-        log.info("用户已登录！");
+        log.info("登录成功！当前登录人数：{}",getOnlineCount());
 
 
     }
@@ -97,8 +102,20 @@ public class WebSocketController {
             resChatInfo.setMine(true);
             resChatInfo.setFromid(inputModel.getData().getMine().getId()); //消息发送者id
             resChatInfo.setTimestamp(System.currentTimeMillis());  // 时间戳
+
+            // 将消息对象转为json
+            String resJson = jacksonUtil.objectToJson(resModel);
+            log.info("返回信息Json序列化后的对象：{}",resJson);
+
+            // 获取id+ip的Map Key值
+            String toIp = getIp(inputModel.getData().getTo().getId(), (x) -> x + WebsocketUtil.getRemoteAddress(session).toString());
+            String mineIp = getIp(inputModel.getData().getMine().getId(), (x) -> x + WebsocketUtil.getRemoteAddress(session).toString());
+            // 发送消息
+            toFriendMessage(resJson,toIp,mineIp);
+
         }else{
             resModel.setEmit(ChatEmit.CHAT_MODEL);
+            // 暂时没用
         }
 
 
@@ -119,15 +136,38 @@ public class WebSocketController {
         log.info("服务异常");
     }
 
-    private void toFriendMessage(String content,String toName,String fromName){
+    private void toFriendMessage(String content,String toId,String fromId){
         boolean isOnline = false;
 
         // 判断接受人是否在线
-        /*for(HttpSession httpSession : onlineUsers.keySet()){
-            if (toName.equals(httpSession.getAttribute("username"))){
-                isOnline = true;
+        Boolean online = isOnline(toId, x -> {
+            Set<String> strings = onlineUsers.keySet();
+            for (String string : strings) {
+                if (Objects.equals(string, x)) {
+                    return true;
+                }
             }
-        }*/
+            return false;
+        });
+        if (online){
+            Set<String> ips = onlineUsers.keySet();
+            for (String ip : ips) {
+                if (Objects.equals(ip,toId)){
+                    WebSocketController webSocket = onlineUsers.get(ip);
+                    try {
+                        webSocket.session.getBasicRemote().sendText(content);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+        }else{
+            // 保存到数据库
+            log.info("用户没有在线请");
+        }
+
+
         // 如果存在发送消息
        /* if (isOnline){
             for(HttpSession httpSession : onlineUsers.keySet()){
@@ -144,6 +184,25 @@ public class WebSocketController {
 
     }
 
+    /**
+     * 获取id+ip的值 作为Map中的Key
+     * @param id
+     * @param fun
+     * @return
+     */
+    private String getIp(String id, Function<String,String> fun){
+        return fun.apply(id);
+    }
+
+    /**
+     * 查询用户是否在线
+     * @param mapKey
+     * @param pre
+     * @return
+     */
+    private Boolean isOnline(String mapKey, Predicate<String> pre){
+        return pre.test(mapKey);
+    }
 
     private String getNames() {
         StringBuffer names = new StringBuffer();
